@@ -37,27 +37,28 @@ __device__ void lbpApply(Mat imgIn_d, Mat imgOut_d, Mat histogram_d){
 	int i = blockIdx.y * blockDim.y + threadIdx.y; //rows
 	int j = blockIdx.x * blockDim.x + threadIdx.x; //cols
 
-	if (i > 0 && i < imgIn_d.rows - 1 && j > 0 && j < imgIn_d.cols - 1)
+	if (i > 0 && i < imgIn_d.rows - 1 && j > 0 && j < imgIn_d.cols - 1){
 
-	int neighbors[8];
-	neighbors[0] = imgIn.at<uchar>(i - 1, j - 1);
-	neighbors[1] = imgIn.at<uchar>(i - 1, j);
-	neighbors[2] = imgIn.at<uchar>(i - 1, j + 1);
-	neighbors[3] = imgIn.at<uchar>(i, j + 1);
-	neighbors[4] = imgIn.at<uchar>(i + 1, j + 1);
-	neighbors[5] = imgIn.at<uchar>(i + 1, j);
-	neighbors[6] = imgIn.at<uchar>(i + 1, j - 1);
-	neighbors[7] = imgIn.at<uchar>(i, j - 1);
+		int neighbors[8];
+		neighbors[0] = imgIn.at<uchar>(i - 1, j - 1);
+		neighbors[1] = imgIn.at<uchar>(i - 1, j);
+		neighbors[2] = imgIn.at<uchar>(i - 1, j + 1);
+		neighbors[3] = imgIn.at<uchar>(i, j + 1);
+		neighbors[4] = imgIn.at<uchar>(i + 1, j + 1);
+		neighbors[5] = imgIn.at<uchar>(i + 1, j);
+		neighbors[6] = imgIn.at<uchar>(i + 1, j - 1);
+		neighbors[7] = imgIn.at<uchar>(i, j - 1);
 
-	int oldVal = imgIn.at<uchar>(i, j);
+		int oldVal = imgIn.at<uchar>(i, j);
 
-	int newVal = 0;
-	for (int k = 0; k < 8; k++) {
-		if (neighbors[k] >= oldVal)
-			newVal += weights[k];
+		int newVal = 0;
+		for (int k = 0; k < 8; k++) {
+			if (neighbors[k] >= oldVal)
+				newVal += weights[k];
+		}
+		imgOut.at<uchar>(i - 1, j - 1) = newVal;
+		histogram[newVal]++;
 	}
-	imgOut.at<uchar>(i - 1, j - 1) = newVal;
-	histogram[newVal]++;
 }
 
 
