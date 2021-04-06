@@ -27,6 +27,13 @@
 								<option id="nvcc.compiler.option.level.1122467770" name="Generate host debug information (-g)" superClass="nvcc.compiler.option.level" value="true" valueType="boolean"/>
 								<option defaultValue="nvcc.compiler.optimization.level.none" id="nvcc.compiler.optimization.level.1131313400" name="Optimization Level" superClass="nvcc.compiler.optimization.level" valueType="enumerated"/>
 								<option id="nvcc.compiler.pic.1292730839" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
+								<option id="nvcc.compiler.include.paths.1898448326" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/home/PC2020user8/Downloads/opencv-4.5.1/include/opencv2"/>
+									<listOptionValue builtIn="false" value="/home/PC2020user8/Downloads/opencv-4.5.1/include"/>
+									<listOptionValue builtIn="false" value="/home/PC2020user8/Downloads/opencv-4.5.1"/>
+									<listOptionValue builtIn="false" value="/home/PC2020user8/Downloads/opt/opencv"/>
+								</option>
+								<option id="nvcc.compiler.include.files.430882353" superClass="nvcc.compiler.include.files" valueType="includeFiles"/>
 								<inputType id="nvcc.compiler.input.cu.120409331" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.822618782" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1035253218" superClass="nvcc.compiler.input.c"/>
@@ -53,6 +60,7 @@
 					<sass major="5" minor="2"/>
 					<ptx major="5" minor="2"/>
 				</executable>
+				<editor-arch major="5" minor="2"/>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 		</cconfiguration>
@@ -128,4 +136,5 @@
 		</scannerConfigBuildInfo>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 </cproject>
