@@ -14,7 +14,8 @@ using namespace std;
 using namespace cv;
 using namespace std::chrono;
 
-__constant__ int weights[8];
+__constant__ int weights[3][3];
+#define BLOCK_WIDTH 16
 
  static void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err)
 {
@@ -36,40 +37,83 @@ __global__ void warm_up_gpu(){  // this kernel avoids cold start when evaluating
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
+__global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
 
-__global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
+	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
+	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
+	int bi = threadIdx.y;
+	int bj = threadIdx.x;
 
-	int i = blockIdx.y * blockDim.y + threadIdx.y; //row
-	int j = blockIdx.x * blockDim.x + threadIdx.x; //col
+	__shared__ unsigned char imgIn_s[BLOCK_WIDTH + 2][BLOCK_WIDTH + 2];
+	__shared__ int histogram_s[256];
 
-	//+++++++++++++++++++++++++++++++++++++++++++missing histogram and tiling++++++++++++++++++++++++++++++++++++++++++++++++++
-
+	histogram_s[bj * 16 + bi] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
 
 	if (i < rows && j < cols){
-		int neighbors[8];
+		imgIn_s[bi][bj] = imgIn_d[(i) * (cols + 2) + j]; // imgIn_d(i, j);
+		if (bj < 2)
+			imgIn_s[bi][bj + BLOCK_WIDTH] = imgIn_d[ (i) * (cols + 2) + j + BLOCK_WIDTH]; //imgIn_d(i, j + BLOCK_WIDTH)
+		if (bi < 2)
+			imgIn_s[bi + BLOCK_WIDTH][bj] = imgIn_d[ (i + BLOCK_WIDTH) * (cols + 2) + j];  //imgIn_d(i + BLOCK_WIDTH, j)
+		if (bi + 2 >= BLOCK_WIDTH && bj + 2 >= BLOCK_WIDTH)
+			imgIn_s[bi + 2 ][bj + 2] = imgIn_d[(i + 2) * (cols + 2) + j + 2];
+
+	}
+	__syncthreads();
+
+	if (i < rows && j < cols){
+		int oldVal = imgIn_s[bi + 1][bj + 1];
+
+		int newVal = 0;
+		for (int u = 0; u < 3; u++) {
+			for (int v = 0; v < 3; v++){
+				if (imgIn_s[bi + u][bj + v] >= oldVal)
+					newVal += weights[u][v];
+			}
+		}
+		imgOut_d[i * cols + j] = newVal;
+		atomicAdd(&histogram_s[newVal], 1);
+	}
+	__syncthreads();
+
+	//commit histogram to global memory
+	atomicAdd(&histogram_d[bi * 16 + bj], histogram_s[bi * 16 + bj]);
+
+	//__syncthreads();
+
+}
+
+//same function without using shared memory
+__global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
+
+	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
+	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
+
+	if (i < rows && j < cols){
+		int neighbors[3][3];
 
 		// remember that imgOut_d[i * cols + j] -> imgIn_d[ (i + 1) * (cols + 2) + j + 1 ];
 
-		neighbors[0] = imgIn_d[(i) * (cols + 2) + j]; // (i - 1, j - 1);
-		neighbors[1] = imgIn_d[(i) * (cols + 2) + j + 1]; // (i - 1, j);
-		neighbors[2] = imgIn_d[(i) * (cols + 2) + j + 2]; // (i - 1, j + 1);
-		neighbors[3] = imgIn_d[(i + 1) * (cols + 2) + j + 2]; // (i, j + 1);
-		neighbors[4] = imgIn_d[(i + 2) * (cols + 2) + j + 2]; // (i + 1, j + 1);
-		neighbors[5] = imgIn_d[(i + 2) * (cols + 2) + j + 1]; // (i + 1, j);
-		neighbors[6] = imgIn_d[(i + 2) * (cols + 2) + j]; // (i + 1, j - 1);
-		neighbors[7] = imgIn_d[(i + 1) * (cols + 2) + j]; // (i, j - 1);
+		neighbors[0][0] = imgIn_d[(i) * (cols + 2) + j]; // (i - 1, j - 1);
+		neighbors[0][1] = imgIn_d[(i) * (cols + 2) + j + 1]; // (i - 1, j);
+		neighbors[0][2] = imgIn_d[(i) * (cols + 2) + j + 2]; // (i - 1, j + 1);
+		neighbors[1][0] = imgIn_d[(i + 1) * (cols + 2) + j]; // (i, j - 1);
+		neighbors[1][1] = 0;
+		neighbors[1][2] = imgIn_d[(i + 1) * (cols + 2) + j + 2]; // (i, j + 1);
+		neighbors[2][0] = imgIn_d[(i + 2) * (cols + 2) + j]; // (i + 1, j - 1);
+		neighbors[2][1] = imgIn_d[(i + 2) * (cols + 2) + j + 1]; // (i + 1, j);
+		neighbors[2][2] = imgIn_d[(i + 2) * (cols + 2) + j + 2]; // (i + 1, j + 1);
 
 		int oldVal = imgIn_d[ (i + 1) * (cols + 2) + j + 1 ]; // (i, j);
 
 		int newVal = 0;
-		for (int k = 0; k < 8; k++) {
-			if (neighbors[k] >= oldVal)
-				newVal += weights[k];
-		}
+		for (int u = 0; u < 3; u ++)
+			for (int v = 0; v < 3; v++)
+				if (neighbors[u][v] >= oldVal)
+					newVal += weights[u][v];
+
 		imgOut_d[i * cols + j] = newVal;
-
-		//histogram[newVal]++;
-
+		atomicAdd(&histogram_d[newVal], 1);
 	}
 
 }
@@ -108,26 +152,26 @@ int main(int argc, char **argv){
 	CUDA_CHECK_RETURN(cudaMemset(histogram_d, 0, sizeof(int) * 256 ));
 
 	//weights
-	int weights_h[8] = {1, 2, 4, 8, 16, 32, 64, 128};
+	int weights_h[3][3] = {1, 2, 4, 128, 0, 8, 64, 32, 16};
 	cudaMemcpyToSymbol(weights, &weights_h, sizeof(int) * 8);
 
 
-	dim3 blockDim(16,16);
+	dim3 blockDim(BLOCK_WIDTH, BLOCK_WIDTH);
 	dim3 gridDim(ceil( (float) imgOut_h.cols / blockDim.x), ceil( (float) imgOut_h.rows / blockDim.y) );
-	lbpApply<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
+	//lbpApply<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
+	lbpApplyS<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
 	cudaDeviceSynchronize();
 
 	CUDA_CHECK_RETURN(cudaMemcpy(imgOut_h.data, imgOut_d, imgOutSize, cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaMemcpy(histogram_h, histogram_d, sizeof(int) * 256, cudaMemcpyDeviceToHost));
 
-	//writeCsv(histogram_h);
-
+	writeCsv(histogram_h); //FIXME histogram not working
 
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
 
-	imshow("Image after LBP", imgOut_h);
-	waitKey(0);
+	//imshow("Image after LBP", imgOut_h);
+	//waitKey(0);
 
 	return ms_int.count();
 
