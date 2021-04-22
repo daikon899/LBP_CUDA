@@ -50,7 +50,7 @@ __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *
 
 	int tid = bi * BLOCK_WIDTH + bj;
 	if(tid < 256)
-		histogram_s[bi * BLOCK_WIDTH + bj] = 0; // NOTE: if BLOCK_WIDTH < 16 does not work!
+		histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH < 16 does not work!
 
 	//load one part of image in shared memory
 	imgIn_s[bi][bj] = imgIn_d[ i * (colsB) + j];
