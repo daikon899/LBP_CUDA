@@ -38,39 +38,40 @@ __global__ void warm_up_gpu(){  // this kernel avoids cold start when evaluating
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
-
 	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
 	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
 	int bi = threadIdx.y;
 	int bj = threadIdx.x;
+	int colsB = cols + BLOCK_WIDTH; //columns number considering border
+
 
 	__shared__ unsigned char imgIn_s[BLOCK_WIDTH + 2][BLOCK_WIDTH + 2];
 	__shared__ int histogram_s[256];
 
-	histogram_s[bj * 16 + bi] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
+	int tid = bi * BLOCK_WIDTH + bj;
+	if(tid < 256)
+		histogram_s[bi * BLOCK_WIDTH + bj] = 0; // NOTE: if BLOCK_WIDTH < 16 does not work!
 
-	if (i < rows && j < cols){
-		imgIn_s[bi][bj] = imgIn_d[(i) * (cols + 2) + j]; // imgIn_d(i, j);
-		if (bj < 2)
-			imgIn_s[bi][bj + BLOCK_WIDTH] = imgIn_d[ (i) * (cols + 2) + j + BLOCK_WIDTH]; //imgIn_d(i, j + BLOCK_WIDTH)
-		if (bi < 2)
-			imgIn_s[bi + BLOCK_WIDTH][bj] = imgIn_d[ (i + BLOCK_WIDTH) * (cols + 2) + j];  //imgIn_d(i + BLOCK_WIDTH, j)
-		if (bi + 2 >= BLOCK_WIDTH && bj + 2 >= BLOCK_WIDTH)
-			imgIn_s[bi + 2 ][bj + 2] = imgIn_d[(i + 2) * (cols + 2) + j + 2];
+	//load one part of image in shared memory
+	imgIn_s[bi][bj] = imgIn_d[ i * (colsB) + j];
+	if (bj < 2)
+		imgIn_s[bi][bj + BLOCK_WIDTH] = imgIn_d[ i * (colsB) + j + BLOCK_WIDTH];
+	if (bi < 2)
+		imgIn_s[bi + BLOCK_WIDTH][bj] = imgIn_d[ (i + BLOCK_WIDTH) * (colsB) + j];
+	if (bi >= BLOCK_WIDTH - 2 && bj >= BLOCK_WIDTH - 2)
+		imgIn_s[bi + 2][bj + 2] = imgIn_d[(i + 2) * (colsB) + j + 2];
 
-	}
 	__syncthreads();
+
 
 	if (i < rows && j < cols){
 		int oldVal = imgIn_s[bi + 1][bj + 1];
-
 		int newVal = 0;
-		for (int u = 0; u < 3; u++) {
-			for (int v = 0; v < 3; v++){
+		for (int u = 0; u < 3; u++)
+			for (int v = 0; v < 3; v++)
 				if (imgIn_s[bi + u][bj + v] >= oldVal)
 					newVal += weights[u][v];
-			}
-		}
+
 		imgOut_d[i * cols + j] = newVal;
 		atomicAdd(&histogram_s[newVal], 1);
 	}
@@ -78,33 +79,32 @@ __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *
 
 	//commit histogram to global memory
 	atomicAdd(&histogram_d[bi * 16 + bj], histogram_s[bi * 16 + bj]);
-
-	//__syncthreads();
-
 }
 
-//same function without using shared memory
+
+//same function with no use of shared memory
 __global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
 
 	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
 	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
+	int colsB = cols + BLOCK_WIDTH; //columns number considering border
 
 	if (i < rows && j < cols){
 		int neighbors[3][3];
 
 		// remember that imgOut_d[i * cols + j] -> imgIn_d[ (i + 1) * (cols + 2) + j + 1 ];
 
-		neighbors[0][0] = imgIn_d[(i) * (cols + 2) + j]; // (i - 1, j - 1);
-		neighbors[0][1] = imgIn_d[(i) * (cols + 2) + j + 1]; // (i - 1, j);
-		neighbors[0][2] = imgIn_d[(i) * (cols + 2) + j + 2]; // (i - 1, j + 1);
-		neighbors[1][0] = imgIn_d[(i + 1) * (cols + 2) + j]; // (i, j - 1);
+		neighbors[0][0] = imgIn_d[(i) * (colsB) + j]; // (i - 1, j - 1);
+		neighbors[0][1] = imgIn_d[(i) * (colsB) + j + 1]; // (i - 1, j);
+		neighbors[0][2] = imgIn_d[(i) * (colsB) + j + 2]; // (i - 1, j + 1);
+		neighbors[1][0] = imgIn_d[(i + 1) * (colsB) + j]; // (i, j - 1);
 		neighbors[1][1] = 0;
-		neighbors[1][2] = imgIn_d[(i + 1) * (cols + 2) + j + 2]; // (i, j + 1);
-		neighbors[2][0] = imgIn_d[(i + 2) * (cols + 2) + j]; // (i + 1, j - 1);
-		neighbors[2][1] = imgIn_d[(i + 2) * (cols + 2) + j + 1]; // (i + 1, j);
-		neighbors[2][2] = imgIn_d[(i + 2) * (cols + 2) + j + 2]; // (i + 1, j + 1);
+		neighbors[1][2] = imgIn_d[(i + 1) * (colsB) + j + 2]; // (i, j + 1);
+		neighbors[2][0] = imgIn_d[(i + 2) * (colsB) + j]; // (i + 1, j - 1);
+		neighbors[2][1] = imgIn_d[(i + 2) * (colsB) + j + 1]; // (i + 1, j);
+		neighbors[2][2] = imgIn_d[(i + 2) * (colsB) + j + 2]; // (i + 1, j + 1);
 
-		int oldVal = imgIn_d[ (i + 1) * (cols + 2) + j + 1 ]; // (i, j);
+		int oldVal = imgIn_d[ (i + 1) * (colsB) + j + 1 ]; // (i, j);
 
 		int newVal = 0;
 		for (int u = 0; u < 3; u ++)
@@ -119,6 +119,7 @@ __global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *h
 }
 
 
+
 // TODO insert main code in this function:
 //__host__ Mat localBinaryPattern(const Mat &imgIn_h) {}
 
@@ -131,7 +132,7 @@ int main(int argc, char **argv){
 	//warm_up_gpu<<<128, 128>>>();  // avoids cold start for testing purposes
 	auto start = chrono::high_resolution_clock::now();
 
-	// output image
+	//output image
 	unsigned char *imgOut_d;
 	size_t imgOutSize = imgIn_h.step * imgIn_h.rows;
 	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgOut_d, imgOutSize));
@@ -140,7 +141,7 @@ int main(int argc, char **argv){
 
 	//input image
 	unsigned char *imgIn_d;
-	copyMakeBorder(imgIn_h, imgIn_h, 1, 1, 1, 1, BORDER_CONSTANT, 0);
+	copyMakeBorder(imgIn_h, imgIn_h, 1, BLOCK_WIDTH - 1, 1, BLOCK_WIDTH - 1, BORDER_CONSTANT, 0);
 	size_t imgInSize = imgIn_h.step * imgIn_h.rows;
 	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgIn_d, imgInSize));
 	CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, imgIn_h.data, imgInSize, cudaMemcpyHostToDevice));
@@ -153,7 +154,7 @@ int main(int argc, char **argv){
 
 	//weights
 	int weights_h[3][3] = {1, 2, 4, 128, 0, 8, 64, 32, 16};
-	cudaMemcpyToSymbol(weights, &weights_h, sizeof(int) * 8);
+	cudaMemcpyToSymbol(weights, &weights_h, sizeof(int) * 9);
 
 
 	dim3 blockDim(BLOCK_WIDTH, BLOCK_WIDTH);
@@ -165,7 +166,7 @@ int main(int argc, char **argv){
 	CUDA_CHECK_RETURN(cudaMemcpy(imgOut_h.data, imgOut_d, imgOutSize, cudaMemcpyDeviceToHost));
 	CUDA_CHECK_RETURN(cudaMemcpy(histogram_h, histogram_d, sizeof(int) * 256, cudaMemcpyDeviceToHost));
 
-	writeCsv(histogram_h); //FIXME histogram not working
+	writeCsv(histogram_h);
 
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
