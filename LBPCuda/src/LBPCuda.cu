@@ -65,7 +65,7 @@ __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *
 
 
 	if (i < rows && j < cols){
-		int oldVal = imgIn_s[bi + 1][bj + 1];
+		int oldVal = imgIn_s[bi + 1][bj + 1]; // fuori dall' if?
 		int newVal = 0;
 		for (int u = 0; u < 3; u++)
 			for (int v = 0; v < 3; v++)
@@ -171,8 +171,15 @@ int main(int argc, char **argv){
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
 
-	//imshow("Image after LBP", imgOut_h);
-	//waitKey(0);
+
+	imshow("Image after LBP", imgOut_h);
+	waitKey(0);
+
+	free(histogram_h);
+
+	cudaFree(imgOut_d);
+	cudaFree(imgIn_d);
+	cudaFree(histogram_d);
 
 	return ms_int.count();
 
