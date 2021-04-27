@@ -119,58 +119,54 @@ __global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *h
 }
 
 
-
-// TODO insert main code in this function:
 __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 	//output image
-		unsigned char *imgOut_d;
-		size_t imgOutSize = imgIn_h.step * imgIn_h.rows;
-		CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgOut_d, imgOutSize));
-		Mat imgOut_h = Mat::zeros(imgIn_h.rows, imgIn_h.cols, CV_8UC1);
+	unsigned char *imgOut_d;
+	size_t imgOutSize = imgIn_h.step * imgIn_h.rows;
+	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgOut_d, imgOutSize));
+	Mat imgOut_h = Mat::zeros(imgIn_h.rows, imgIn_h.cols, CV_8UC1);
 
+	//input image
+	unsigned char *imgIn_d;
+	copyMakeBorder(imgIn_h, imgIn_h, 1, BLOCK_WIDTH - 1, 1, BLOCK_WIDTH - 1, BORDER_CONSTANT, 0);
+	size_t imgInSize = imgIn_h.step * imgIn_h.rows;
+	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgIn_d, imgInSize));
+	CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, imgIn_h.data, imgInSize, cudaMemcpyHostToDevice));
 
-		//input image
-		unsigned char *imgIn_d;
-		copyMakeBorder(imgIn_h, imgIn_h, 1, BLOCK_WIDTH - 1, 1, BLOCK_WIDTH - 1, BORDER_CONSTANT, 0);
-		size_t imgInSize = imgIn_h.step * imgIn_h.rows;
-		CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgIn_d, imgInSize));
-		CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, imgIn_h.data, imgInSize, cudaMemcpyHostToDevice));
+	//histogram
+	int *histogram_h, *histogram_d;
+	histogram_h = (int *) malloc(sizeof(int) * 256);
+	CUDA_CHECK_RETURN(cudaMalloc((void ** )&histogram_d, sizeof(int) * 256));
+	CUDA_CHECK_RETURN(cudaMemset(histogram_d, 0, sizeof(int) * 256 ));
 
-		//histogram
-		int *histogram_h, *histogram_d;
-		histogram_h = (int *) malloc(sizeof(int) * 256);
-		CUDA_CHECK_RETURN(cudaMalloc((void ** )&histogram_d, sizeof(int) * 256));
-		CUDA_CHECK_RETURN(cudaMemset(histogram_d, 0, sizeof(int) * 256 ));
+	//weights
+	int weights_h[3][3] = {1, 2, 4, 128, 0, 8, 64, 32, 16};
+	cudaMemcpyToSymbol(weights, &weights_h, sizeof(int) * 9);
 
-		//weights
-		int weights_h[3][3] = {1, 2, 4, 128, 0, 8, 64, 32, 16};
-		cudaMemcpyToSymbol(weights, &weights_h, sizeof(int) * 9);
+	dim3 blockDim(BLOCK_WIDTH, BLOCK_WIDTH);
+	dim3 gridDim(ceil( (float) imgOut_h.cols / blockDim.x), ceil( (float) imgOut_h.rows / blockDim.y) );
+	//lbpApply<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
+	lbpApplyS<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
+	cudaDeviceSynchronize();
 
+	CUDA_CHECK_RETURN(cudaMemcpy(imgOut_h.data, imgOut_d, imgOutSize, cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(histogram_h, histogram_d, sizeof(int) * 256, cudaMemcpyDeviceToHost));
 
-		dim3 blockDim(BLOCK_WIDTH, BLOCK_WIDTH);
-		dim3 gridDim(ceil( (float) imgOut_h.cols / blockDim.x), ceil( (float) imgOut_h.rows / blockDim.y) );
-		//lbpApply<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
-		lbpApplyS<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
-		cudaDeviceSynchronize();
+	writeCsv(histogram_h);
 
-		CUDA_CHECK_RETURN(cudaMemcpy(imgOut_h.data, imgOut_d, imgOutSize, cudaMemcpyDeviceToHost));
-		CUDA_CHECK_RETURN(cudaMemcpy(histogram_h, histogram_d, sizeof(int) * 256, cudaMemcpyDeviceToHost));
+	free(histogram_h);
 
-		writeCsv(histogram_h);
+	cudaFree(imgOut_d);
+	cudaFree(imgIn_d);
+	cudaFree(histogram_d);
 
-		free(histogram_h);
-
-		cudaFree(imgOut_d);
-		cudaFree(imgIn_d);
-		cudaFree(histogram_d);
-
-		return imgOut_h;
+	return imgOut_h;
 }
 
 
 int main(int argc, char **argv){
-	//String imgName = argv[1];
-	String imgName = "images.jpg";
+	String imgName = argv[1];
+	//String imgName = "images.jpg";
 	Mat imgIn_h = cv::imread("input/" + imgName, 0);
 
 
