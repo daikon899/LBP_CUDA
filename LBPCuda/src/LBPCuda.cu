@@ -169,8 +169,8 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 
 
 int main(int argc, char **argv){
-	String imgName = argv[1];
-	//String imgName = "images.jpg";
+	//String imgName = argv[1];
+	String imgName = "images.jpg";
 	Mat imgIn_h = cv::imread("input/" + imgName, 0);
 
 
@@ -186,6 +186,10 @@ int main(int argc, char **argv){
 	imshow("Image after LBP", imgOut_h);
 	waitKey(0);
 
-	return ms_int.count();
+	int time = ms_int.count();
+
+	printf("image processed in %d milliseconds \n", time);
+
+	return time;
 
 }
