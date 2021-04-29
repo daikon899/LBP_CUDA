@@ -38,38 +38,39 @@ __global__ void warm_up_gpu(){  // this kernel avoids cold start when evaluating
 
 //----------------------------------------------------------------------------------------------------------------------------------------
 __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
-	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
-	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
 	int bi = threadIdx.y;
 	int bj = threadIdx.x;
+	int i = blockIdx.y * blockDim.y + bi; //row of imgOut
+	int j = blockIdx.x * blockDim.x + bj; //col of imgOut
 	int colsB = cols + BLOCK_WIDTH; //columns number considering border
 
 
-	__shared__ unsigned char imgIn_s[BLOCK_WIDTH + 2][BLOCK_WIDTH + 2];
+	__shared__ unsigned char imgIn_s[(BLOCK_WIDTH + 2) * (BLOCK_WIDTH + 2)];
 	__shared__ int histogram_s[256];
+	__shared__ int beginLoad;
 
 	int tid = bi * BLOCK_WIDTH + bj;
-	if(tid < 256)
-		histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH < 16 does not work!
+	histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
 
 	//load one part of image in shared memory
-	imgIn_s[bi][bj] = imgIn_d[ i * (colsB) + j];
-	if (bj < 2)
-		imgIn_s[bi][bj + BLOCK_WIDTH] = imgIn_d[ i * (colsB) + j + BLOCK_WIDTH];
-	if (bi < 2)
-		imgIn_s[bi + BLOCK_WIDTH][bj] = imgIn_d[ (i + BLOCK_WIDTH) * (colsB) + j];
-	if (bi >= BLOCK_WIDTH - 2 && bj >= BLOCK_WIDTH - 2)
-		imgIn_s[bi + 2][bj + 2] = imgIn_d[(i + 2) * (colsB) + j + 2];
+
+	if(bi == 0 && bj == 0) beginLoad = i * colsB + j;   //can be calculated for each thread without __shared__ variable
+	__syncthreads();
+
+	imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / (BLOCK_WIDTH + 2)) * colsB) + (tid %  (BLOCK_WIDTH + 2)) ];
+	if (tid < 68){
+		tid += 256;
+		imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / (BLOCK_WIDTH + 2)) * colsB) + (tid %  (BLOCK_WIDTH + 2)) ];
+	}
 
 	__syncthreads();
 
-
 	if (i < rows && j < cols){
-		int oldVal = imgIn_s[bi + 1][bj + 1]; // fuori dall' if?
+		int oldVal = imgIn_s[(bi + 1) * (BLOCK_WIDTH + 2) + (bj + 1)];
 		int newVal = 0;
 		for (int u = 0; u < 3; u++)
 			for (int v = 0; v < 3; v++)
-				if (imgIn_s[bi + u][bj + v] >= oldVal)
+				if (imgIn_s[(bi + u) * (BLOCK_WIDTH + 2) + (bj + v)] >= oldVal)
 					newVal += weights[u][v];
 
 		imgOut_d[i * cols + j] = newVal;
@@ -179,8 +180,8 @@ int main(int argc, char **argv){
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
 
-	imshow("Image after LBP", imgOut_h);
-	waitKey(0);
+	//imshow("Image after LBP", imgOut_h);
+	//waitKey(0);
 
 	int time = ms_int.count();
 
