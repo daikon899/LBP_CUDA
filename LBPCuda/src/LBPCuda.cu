@@ -16,6 +16,7 @@ using namespace std::chrono;
 
 __constant__ int weights[3][3];
 #define BLOCK_WIDTH 16
+#define TILE_WIDTH (BLOCK_WIDTH + 2)
 
  static void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err)
 {
@@ -45,32 +46,28 @@ __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *
 	int colsB = cols + BLOCK_WIDTH; //columns number considering border
 
 
-	__shared__ unsigned char imgIn_s[(BLOCK_WIDTH + 2) * (BLOCK_WIDTH + 2)];
+	__shared__ unsigned char imgIn_s[TILE_WIDTH * TILE_WIDTH];
 	__shared__ int histogram_s[256];
-	__shared__ int beginLoad;
 
 	int tid = bi * BLOCK_WIDTH + bj;
 	histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
 
 	//load one part of image in shared memory
-
-	if(bi == 0 && bj == 0) beginLoad = i * colsB + j;   //can be calculated for each thread without __shared__ variable
-	__syncthreads();
-
-	imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / (BLOCK_WIDTH + 2)) * colsB) + (tid %  (BLOCK_WIDTH + 2)) ];
+	int beginLoad = (blockIdx.y * blockDim.y) * colsB + blockIdx.x * blockDim.x;
+	imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / TILE_WIDTH) * colsB) + (tid % TILE_WIDTH) ];
 	if (tid < 68){
 		tid += 256;
-		imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / (BLOCK_WIDTH + 2)) * colsB) + (tid %  (BLOCK_WIDTH + 2)) ];
+		imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / TILE_WIDTH) * colsB) + (tid %  TILE_WIDTH) ];
 	}
-
 	__syncthreads();
 
+	//elaboration of neighbors
 	if (i < rows && j < cols){
-		int oldVal = imgIn_s[(bi + 1) * (BLOCK_WIDTH + 2) + (bj + 1)];
+		int oldVal = imgIn_s[(bi + 1) * TILE_WIDTH + (bj + 1)];
 		int newVal = 0;
 		for (int u = 0; u < 3; u++)
 			for (int v = 0; v < 3; v++)
-				if (imgIn_s[(bi + u) * (BLOCK_WIDTH + 2) + (bj + v)] >= oldVal)
+				if (imgIn_s[(bi + u) * TILE_WIDTH + (bj + v)] >= oldVal)
 					newVal += weights[u][v];
 
 		imgOut_d[i * cols + j] = newVal;
@@ -93,7 +90,7 @@ __global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *h
 	if (i < rows && j < cols){
 		int neighbors[3][3];
 
-		// remember that imgOut_d[i * cols + j] -> imgIn_d[ (i + 1) * (cols + 2) + j + 1 ];
+		// note: imgOut_d[i * cols + j] -> imgIn_d[ (i + 1) * (cols + 2) + j + 1 ];
 
 		neighbors[0][0] = imgIn_d[(i) * (colsB) + j]; // (i - 1, j - 1);
 		neighbors[0][1] = imgIn_d[(i) * (colsB) + j + 1]; // (i - 1, j);
