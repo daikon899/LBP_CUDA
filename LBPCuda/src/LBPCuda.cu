@@ -17,6 +17,7 @@ using namespace std::chrono;
 __constant__ int weights[3][3];
 #define BLOCK_WIDTH 16
 #define TILE_WIDTH (BLOCK_WIDTH + 2)
+#define NUM_BORDER_PIXELS ((BLOCK_WIDTH * 4) + 4)
 
  static void CheckCudaErrorAux (const char *file, unsigned line, const char *statement, cudaError_t err)
 {
@@ -55,8 +56,8 @@ __global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *
 	//load one part of image in shared memory
 	int beginLoad = (blockIdx.y * blockDim.y) * colsB + blockIdx.x * blockDim.x;
 	imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / TILE_WIDTH) * colsB) + (tid % TILE_WIDTH) ];
-	if (tid < 68){
-		tid += 256;
+	if (tid < NUM_BORDER_PIXELS){
+		tid += BLOCK_WIDTH * BLOCK_WIDTH;
 		imgIn_s[tid] = imgIn_d[ beginLoad +  ((tid / TILE_WIDTH) * colsB) + (tid %  TILE_WIDTH) ];
 	}
 	__syncthreads();
@@ -163,8 +164,8 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 
 
 int main(int argc, char **argv){
-	String imgName = argv[1];
-	//String imgName = "images.jpg";
+	//String imgName = argv[1];
+	String imgName = "images.jpg";
 	Mat imgIn_h = cv::imread("input/" + imgName, 0);
 
 
@@ -177,8 +178,8 @@ int main(int argc, char **argv){
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
 
-	//imshow("Image after LBP", imgOut_h);
-	//waitKey(0);
+	imshow("Image after LBP", imgOut_h);
+	waitKey(0);
 
 	int time = ms_int.count();
 
