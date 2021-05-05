@@ -14,3 +14,13 @@ void writeCsv(int* histogram){
     }
     outputFile.close();
 }
+
+void writeTestResults(int* time, int size) {
+    /*
+    ofstream fileIterations("test_results.csv", ifstream::out);
+    for (int i = 0; i < size; i++ ){
+        fileIterations << time[i] << "\n";
+    }
+    fileIterations.close();
+    */
+}

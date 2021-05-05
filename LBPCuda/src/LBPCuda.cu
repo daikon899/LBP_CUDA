@@ -39,48 +39,6 @@ __global__ void warm_up_gpu(){  // this kernel avoids cold start when evaluating
 }
 
 //----------------------------------------------------------------------------------------------------------------------------------------
-__global__ void lbpApplyS(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
-	int bi = threadIdx.y;
-	int bj = threadIdx.x;
-	int i = blockIdx.y * blockDim.y + bi; //row of imgOut
-	int j = blockIdx.x * blockDim.x + bj; //col of imgOut
-	int colsB = cols + BLOCK_WIDTH; //columns number considering border
-
-
-	__shared__ unsigned char imgIn_s[TILE_WIDTH * TILE_WIDTH];
-	__shared__ int histogram_s[256];
-
-	int tid = bi * BLOCK_WIDTH + bj;
-	histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
-
-	//load one part of image in shared memory
-	int beginLoad = (blockIdx.y * blockDim.y) * colsB + blockIdx.x * blockDim.x;
-	int imgLocation =  beginLoad + ((tid / TILE_WIDTH) * colsB) + (tid % TILE_WIDTH);
-	imgIn_s[tid] = imgIn_d[imgLocation];
-	if (tid < NUM_BORDER_PIXELS){
-		int border = tid + (BLOCK_WIDTH * BLOCK_WIDTH);
-		imgLocation = beginLoad + ((border / TILE_WIDTH) * colsB) + (border %  TILE_WIDTH);
-		imgIn_s[border] = imgIn_d[ imgLocation ];
-	}
-	__syncthreads();
-
-	//elaboration of neighbors
-	if (i < rows && j < cols){
-		int oldVal = imgIn_s[(bi + 1) * TILE_WIDTH + (bj + 1)];
-		int newVal = 0;
-		for (int u = 0; u < 3; u++)
-			for (int v = 0; v < 3; v++)
-				if (imgIn_s[(bi + u) * TILE_WIDTH + (bj + v)] >= oldVal)
-					newVal += weights[u][v];
-
-		imgOut_d[i * cols + j] = newVal;
-		atomicAdd(&histogram_s[newVal], 1);
-	}
-	__syncthreads();
-
-	//commit histogram to global memory
-	atomicAdd(&histogram_d[tid], histogram_s[tid]);
-}
 
 __global__ void lbpApplyV2(unsigned char *imgIn_d, unsigned char *imgOut_d, int *histogram_d, int rows, int cols){
 	int bi = threadIdx.y;
@@ -95,23 +53,22 @@ __global__ void lbpApplyV2(unsigned char *imgIn_d, unsigned char *imgOut_d, int 
 
 	int tid = bi * BLOCK_WIDTH + bj;
 	histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
-	imgIn_s[tid] = 0;
-	if(tid < NUM_BORDER_PIXELS) {
-		int border = tid + (BLOCK_WIDTH * BLOCK_WIDTH);
-		imgIn_s[border] = 0;
-	}
 
 	//load one part of image in shared memory
 	int beginLoad = (blockIdx.y * blockDim.y) * colsB + blockIdx.x * blockDim.x;
 	int imgLocation =  beginLoad + ((tid / TILE_WIDTH) * colsB) + (tid % TILE_WIDTH);
 	if(imgLocation < (rows + 2) * (cols + 2))
 		imgIn_s[tid] = imgIn_d[imgLocation];
+	else
+		imgIn_s[tid] = 0;
 
 	if (tid < NUM_BORDER_PIXELS){
 		int border = tid + (BLOCK_WIDTH * BLOCK_WIDTH);
 		imgLocation = beginLoad + ((border / TILE_WIDTH) * colsB) + (border %  TILE_WIDTH);
 		if(imgLocation < (rows + 2) * (cols + 2))
 			imgIn_s[border] = imgIn_d[imgLocation];
+		else
+			imgIn_s[border] = 0;
 	}
 	__syncthreads();
 
@@ -139,7 +96,7 @@ __global__ void lbpApply(unsigned char *imgIn_d, unsigned char *imgOut_d, int *h
 
 	int i = blockIdx.y * blockDim.y + threadIdx.y; //row of imgOut
 	int j = blockIdx.x * blockDim.x + threadIdx.x; //col of imgOut
-	int colsB = cols + BLOCK_WIDTH; //columns number considering border
+	int colsB = cols + 2; //columns number considering border
 
 	if (i < rows && j < cols){
 		int neighbors[3][3];
@@ -180,8 +137,7 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 
 	//input image
 	unsigned char *imgIn_d;
-	//copyMakeBorder(imgIn_h, imgIn_h, 1, BLOCK_WIDTH - 1, 1, BLOCK_WIDTH - 1, BORDER_CONSTANT, 0);
-	copyMakeBorder(imgIn_h, imgIn_h, 1, 1, 1, 1, BORDER_CONSTANT, 0); // borders for lbpApplyV2
+	copyMakeBorder(imgIn_h, imgIn_h, 1, 1, 1, 1, BORDER_CONSTANT, 0);
 	size_t imgInSize = imgIn_h.step * imgIn_h.rows;
 	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgIn_d, imgInSize));
 	CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, imgIn_h.data, imgInSize, cudaMemcpyHostToDevice));
@@ -199,7 +155,6 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 	dim3 blockDim(BLOCK_WIDTH, BLOCK_WIDTH);
 	dim3 gridDim(ceil( (float) imgOut_h.cols / blockDim.x), ceil( (float) imgOut_h.rows / blockDim.y) );
 	//lbpApply<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
-	//lbpApplyS<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
 	lbpApplyV2<<<gridDim, blockDim>>>(imgIn_d, imgOut_d, histogram_d, imgOut_h.rows, imgOut_h.cols);
 	cudaDeviceSynchronize();
 
@@ -217,6 +172,35 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 	return imgOut_h;
 }
 
+__host__ int* testWithIncreasingSize(int numTests, int N) {
+	int *time =  (int*) malloc(sizeof(int) * numTests);
+	String imgName = "img.jpg";
+	Mat inputImg = imread("input/" + imgName, 0);
+
+	for (int i = 0; i < numTests; i++) {
+	//creating at each iteration a larger image (with double size)
+		if(i != 0)
+			copyMakeBorder(inputImg, inputImg, (inputImg.rows/2), (inputImg.rows/2), (inputImg.cols/2), (inputImg.cols/2), BORDER_CONSTANT, 0);
+
+	        // evaluating the mean time for each iteration
+	        int partialSum = 0;
+	        for (int j = 0; j < N; j++) {
+	            auto start = chrono::high_resolution_clock::now();
+	            localBinaryPattern(inputImg);
+	            auto end = chrono::high_resolution_clock::now();
+	            auto ms_int = duration_cast<chrono::milliseconds>(end - start);
+
+	            partialSum += ms_int.count();
+	        }
+
+	        time[i] = partialSum / N;
+	        cout << "iteration with a " << inputImg.cols << " X " << inputImg.rows << " image ended in " << time[i] << " milliseconds \n";
+	}
+
+	return time;
+}
+
+
 
 int main(int argc, char **argv){
 	//String imgName = argv[1];
@@ -226,6 +210,9 @@ int main(int argc, char **argv){
 
 	//imshow("Image before LBP", imgIn_h);
 	warm_up_gpu<<<128, 128>>>();  // avoids cold start for testing purposes
+
+	int *results = testWithIncreasingSize(5, 10);
+
 	auto start = chrono::high_resolution_clock::now();
 
 	Mat imgOut_h = localBinaryPattern(imgIn_h);

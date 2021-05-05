@@ -3,6 +3,6 @@
 
 
 void writeCsv(int* histogram);
-
+void writeTestResults(int* time, int size);
 
 #endif /* WRITECSV_H_ */
