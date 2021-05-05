@@ -16,11 +16,11 @@ void writeCsv(int* histogram){
 }
 
 void writeTestResults(int* time, int size) {
-    /*
-    ofstream fileIterations("test_results.csv", ifstream::out);
+
+    std::ofstream fileIterations("test_results.csv", std::ifstream::out);
     for (int i = 0; i < size; i++ ){
         fileIterations << time[i] << "\n";
     }
     fileIterations.close();
-    */
+
 }

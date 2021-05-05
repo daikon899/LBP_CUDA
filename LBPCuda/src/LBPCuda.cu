@@ -172,7 +172,7 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 	return imgOut_h;
 }
 
-__host__ int* testWithIncreasingSize(int numTests, int N) {
+__host__ void testWithIncreasingSize(int numTests, int N) {
 	int *time =  (int*) malloc(sizeof(int) * numTests);
 	String imgName = "img.jpg";
 	Mat inputImg = imread("input/" + imgName, 0);
@@ -197,7 +197,7 @@ __host__ int* testWithIncreasingSize(int numTests, int N) {
 	        cout << "iteration with a " << inputImg.cols << " X " << inputImg.rows << " image ended in " << time[i] << " milliseconds \n";
 	}
 
-	return time;
+	writeTestResults(time, numTests);
 }
 
 
@@ -211,7 +211,7 @@ int main(int argc, char **argv){
 	//imshow("Image before LBP", imgIn_h);
 	warm_up_gpu<<<128, 128>>>();  // avoids cold start for testing purposes
 
-	int *results = testWithIncreasingSize(5, 10);
+	testWithIncreasingSize(5, 10);
 
 	auto start = chrono::high_resolution_clock::now();
 
