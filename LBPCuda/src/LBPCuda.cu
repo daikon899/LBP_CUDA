@@ -137,10 +137,11 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 
 	//input image
 	unsigned char *imgIn_d;
-	copyMakeBorder(imgIn_h, imgIn_h, 1, 1, 1, 1, BORDER_CONSTANT, 0);
-	size_t imgInSize = imgIn_h.step * imgIn_h.rows;
+	Mat workingImg_h;
+	copyMakeBorder(imgIn_h, workingImg_h, 1, 1, 1, 1, BORDER_CONSTANT, 0);
+	size_t imgInSize = workingImg_h.step * workingImg_h.rows;
 	CUDA_CHECK_RETURN(cudaMalloc((void ** )&imgIn_d, imgInSize));
-	CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, imgIn_h.data, imgInSize, cudaMemcpyHostToDevice));
+	CUDA_CHECK_RETURN(cudaMemcpy(imgIn_d, workingImg_h.data, imgInSize, cudaMemcpyHostToDevice));
 
 	//histogram
 	int *histogram_h, *histogram_d;
