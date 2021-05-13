@@ -15,7 +15,7 @@ using namespace cv;
 using namespace std::chrono;
 
 __constant__ int weights[3][3];
-#define BLOCK_WIDTH 16
+#define BLOCK_WIDTH 32
 #define TILE_WIDTH (BLOCK_WIDTH + 2)
 #define NUM_BORDER_PIXELS ((BLOCK_WIDTH * 4) + 4)
 
@@ -52,11 +52,13 @@ __global__ void lbpApplyV2(unsigned char *imgIn_d, unsigned char *imgOut_d, int 
 	__shared__ int histogram_s[256];
 
 	int tid = bi * BLOCK_WIDTH + bj;
-	histogram_s[tid] = 0; // NOTE: if BLOCK_WIDTH != 16 does not work!
+	if (tid < 256)
+		histogram_s[tid] = 0;
 
 	//load one part of image in shared memory
 	int beginLoad = (blockIdx.y * blockDim.y) * colsB + blockIdx.x * blockDim.x;
 	int imgLocation =  beginLoad + ((tid / TILE_WIDTH) * colsB) + (tid % TILE_WIDTH);
+
 	if(imgLocation < (rows + 2) * (cols + 2))
 		imgIn_s[tid] = imgIn_d[imgLocation];
 	else
@@ -87,7 +89,8 @@ __global__ void lbpApplyV2(unsigned char *imgIn_d, unsigned char *imgOut_d, int 
 	__syncthreads();
 
 	//commit histogram to global memory
-	atomicAdd(&histogram_d[tid], histogram_s[tid]);
+	if (tid < 256)
+		atomicAdd(&histogram_d[tid], histogram_s[tid]);
 }
 
 
@@ -175,13 +178,15 @@ __host__ Mat localBinaryPattern(Mat &imgIn_h) {
 
 __host__ void testWithIncreasingSize(int numTests, int N) {
 	int *time =  (int*) malloc(sizeof(int) * numTests);
-	String imgName = "img.jpg";
+	String imgName = "img-smaller.jpg";
 	Mat inputImg = imread("input/" + imgName, 0);
+	int colBorder = inputImg.cols / 2;
+	int rowBorder = inputImg.rows / 2;
 
 	for (int i = 0; i < numTests; i++) {
 	//creating at each iteration a larger image (with double size)
 		if(i != 0)
-			copyMakeBorder(inputImg, inputImg, (inputImg.rows/2), (inputImg.rows/2), (inputImg.cols/2), (inputImg.cols/2), BORDER_CONSTANT, 0);
+			copyMakeBorder(inputImg, inputImg, rowBorder, rowBorder, colBorder, colBorder, BORDER_CONSTANT, 0);
 
 	        // evaluating the mean time for each iteration
 	        int partialSum = 0;
@@ -189,13 +194,13 @@ __host__ void testWithIncreasingSize(int numTests, int N) {
 	            auto start = chrono::high_resolution_clock::now();
 	            localBinaryPattern(inputImg);
 	            auto end = chrono::high_resolution_clock::now();
-	            auto ms_int = duration_cast<chrono::milliseconds>(end - start);
+	            auto ms_int = duration_cast<chrono::microseconds>(end - start);
 
 	            partialSum += ms_int.count();
 	        }
 
 	        time[i] = partialSum / N;
-	        cout << "iteration with a " << inputImg.cols << " X " << inputImg.rows << " image ended in " << time[i] << " milliseconds \n";
+	        cout << "iteration with a " << inputImg.cols << " X " << inputImg.rows << " image ended in " << time[i] << " microseconds \n";
 	}
 
 	writeTestResults(time, numTests);
@@ -205,14 +210,15 @@ __host__ void testWithIncreasingSize(int numTests, int N) {
 
 int main(int argc, char **argv){
 	//String imgName = argv[1];
-	String imgName = "images2.jpg";
-	Mat imgIn_h = cv::imread("input/" + imgName, 0);
+	String imgName = "input/images2.jpg";
+	Mat imgIn_h = cv::imread(argv[1], 0);
 
 
-	//imshow("Image before LBP", imgIn_h);
+	imshow("Image before LBP", imgIn_h);
+	waitKey(0);
 	warm_up_gpu<<<128, 128>>>();  // avoids cold start for testing purposes
 
-	testWithIncreasingSize(5, 10);
+	//testWithIncreasingSize(40, 10);
 
 	auto start = chrono::high_resolution_clock::now();
 
@@ -221,13 +227,13 @@ int main(int argc, char **argv){
 	auto end = chrono::high_resolution_clock::now();
 	auto ms_int = duration_cast<chrono::milliseconds>(end - start);
 
-	//imshow("Image after LBP", imgOut_h);
-	//waitKey(0);
+	imshow("Image after LBP", imgOut_h);
+	waitKey(0);
 
 	int time = ms_int.count();
 
 	printf("image processed in %d milliseconds \n", time);
 
-	return time;
+	return 0;
 
 }
