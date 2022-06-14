@@ -21,10 +21,10 @@ We compared running time of three versions of algorithms:
 - Optimized GPU accelerated version using also shared memory
 
 <p align = "center">
-<img src = "docs/running_time.png" width="50%">
+<img src = "docs/running_t.png" width="50%">
 </p>
 <p align = "center">
-Processing time for 200x200 size image
+Running time varying input image size
 </p>
 
 
