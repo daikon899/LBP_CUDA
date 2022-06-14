@@ -16,9 +16,9 @@ This project is intended to compare speed performances wrt sequential [CPU-only 
 # Test
 
 We compared running time of three versions of algorithms:
-- Simple sequential CPU version
-- Non-optimized GPU accelerated version that uses only global memory
-- Optimized GPU accelerated version using also shared memory
+- Simple **sequential** CPU version
+- Non-optimized GPU accelerated version that uses only **global memory**
+- Optimized GPU accelerated version using also **shared memory**
 
 <p align = "center">
 <img src = "docs/running_t.png" width="50%">
@@ -29,10 +29,10 @@ Running time varying input image size
 
 
 ## Speed up
-Up to x15 on GeForce GTX 980 Ti
+**UP TO 15x** on GeForce GTX 980 Ti
 
 ## More details
-Please check our [report](/docs/report.pdf) (italian only, sorry)
+Please check our [report](/docs/report.pdf) (_available only in italian language, sorry_)
 
 
 # Other versions
