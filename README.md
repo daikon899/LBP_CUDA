@@ -13,7 +13,7 @@ This project is intended to compare speed performances wrt sequential [CPU-only 
 - Run the program specifying the image name, for example ```LBPSequential imgname.jpg```
 - At the end of the run an histogram will be generated in ```output/```
 
-# Test
+# Comparison
 
 We compared running time of three versions of algorithms:
 - Simple **sequential** CPU version
