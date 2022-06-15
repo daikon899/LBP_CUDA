@@ -34,7 +34,7 @@ We could reach up to ***15x speed-up*** on GeForce GTX 980 Ti.
 # More details
 For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available only in italian language, sorry_)
 
-We also made a similar comparison between CPU-only sequential vs CPU-only [multithread version](https://github.com/sim-pez/LBP_OpenMP) with OpenMP.
+We also made a similar comparison between sequential vs [multithread version](https://github.com/sim-pez/lbp_omp) on CPU only.
 
 
 # Acknowledgments
