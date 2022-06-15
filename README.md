@@ -3,7 +3,7 @@
 
 # Intro 
 
-This repository contains an implementation of [Local Binary Pattern](https://en.wikipedia.org/wiki/Local_binary_patterns) algorithm using GPU acceleration in CUDA C. 
+This repository contains an implementation of [Local Binary Pattern](https://en.wikipedia.org/wiki/Local_binary_patterns) algorithm using GPU acceleration with CUDA. 
 This project is made to compare speed performances wrt sequential [CPU-only version](https://github.com/MarcoSolarino/LBPSequential/tree/master) implementation.
 
 
