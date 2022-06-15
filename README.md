@@ -4,7 +4,7 @@
 # Intro 
 
 This repository contains an implementation of [Local Binary Pattern](https://en.wikipedia.org/wiki/Local_binary_patterns) algorithm using GPU acceleration with CUDA. 
-This project is made to compare speed performances wrt sequential [CPU-only version](https://github.com/MarcoSolarino/LBPSequential/tree/master).
+The project is made to compare speed performances wrt sequential [CPU-only version](https://github.com/MarcoSolarino/LBPSequential/tree/master).
 
 
 # Usage
@@ -32,7 +32,7 @@ We could reach up to ***15x speed-up*** on GeForce GTX 980 Ti.
 
 
 # More details
-For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available only in italian, sorry_)
+For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available in italian only, sorry_)
 
 We also made a similar comparison between sequential vs [multithread version](https://github.com/sim-pez/lbp_omp) on CPU only.
 
