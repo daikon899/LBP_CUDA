@@ -10,7 +10,7 @@ This project is made to compare speed performances wrt sequential [CPU-only vers
 # Usage
 
 - Place an image in .jpg format in ```input/``` folder
-- Run the program specifying the image name, for example ```LBPSequential imgname.jpg```
+- Run the program specifying the image name
 - At the end of the run an histogram will be generated in ```output/```
 
 # Performances
