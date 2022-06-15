@@ -4,7 +4,7 @@
 # Intro 
 
 This repository contains an implementation of [Local Binary Pattern](https://en.wikipedia.org/wiki/Local_binary_patterns) algorithm using GPU acceleration in CUDA C. 
-This project is intended to compare speed performances wrt sequential [CPU-only version](https://github.com/MarcoSolarino/LBPSequential/tree/master) of this algorithm.
+This project is intended to compare speed performances wrt sequential [CPU-only version](https://github.com/MarcoSolarino/LBPSequential/tree/master) implementation.
 
 
 # Usage
@@ -13,7 +13,7 @@ This project is intended to compare speed performances wrt sequential [CPU-only 
 - Run the program specifying the image name, for example ```LBPSequential imgname.jpg```
 - At the end of the run an histogram will be generated in ```output/```
 
-# Comparison
+# Performances
 
 We compared running time of three versions of algorithms:
 - Simple **sequential** CPU version
@@ -24,20 +24,20 @@ We compared running time of three versions of algorithms:
 <img src = "docs/running_t.png" width="50%">
 </p>
 <p align = "center">
-Running time varying input image size
+Running time for different sizes of a square image
 </p>
 
 
 ## Speed up
-**UP TO 15x** on GeForce GTX 980 Ti
+***Up to 15x*** on GeForce GTX 980 Ti.
 
-## More details
-Please check our [report](/docs/report.pdf) (_available only in italian language, sorry_)
+# More details
+For a detailed description of code implementations and tests you can check our [report](/docs/report.pdf). (_available only in italian language, sorry_)
 
 
-# Other versions
+## Other versions
 We made a similar comparison between CPU-only sequential vs CPU-only [multithread version](https://github.com/sim-pez/LBP_OpenMP) with OpenMP.
 
 
-# Acknowledgments
-Parallel Computing - Computer Engineering Master Degree @[University of Florence](https://www.unifi.it/changelang-eng.html)
+## Acknowledgments
+Parallel Computing - Computer Engineering Master Degree @[University of Florence](https://www.unifi.it/changelang-eng.html).
