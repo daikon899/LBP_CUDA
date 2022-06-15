@@ -15,7 +15,7 @@ This project is intended to compare speed performances wrt sequential [CPU-only 
 
 # Performances
 
-We compared running time of three versions of algorithms:
+We compared running time between three different implementations:
 - Simple **sequential** CPU version
 - Non-optimized GPU accelerated version that uses only **global memory**
 - Optimized GPU accelerated version using also **shared memory**
@@ -28,16 +28,14 @@ Running time for different sizes of a square image
 </p>
 
 
-## Speed up
-***Up to 15x*** on GeForce GTX 980 Ti.
+We could reach up to ***15x speed-up*** on GeForce GTX 980 Ti.
+
 
 # More details
-For a detailed description of code implementations and tests you can check our [report](/docs/report.pdf). (_available only in italian language, sorry_)
+For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available only in italian language, sorry_)
+
+We also made a similar comparison between CPU-only sequential vs CPU-only [multithread version](https://github.com/sim-pez/LBP_OpenMP) with OpenMP.
 
 
-## Other versions
-We made a similar comparison between CPU-only sequential vs CPU-only [multithread version](https://github.com/sim-pez/LBP_OpenMP) with OpenMP.
-
-
-## Acknowledgments
+# Acknowledgments
 Parallel Computing - Computer Engineering Master Degree @[University of Florence](https://www.unifi.it/changelang-eng.html).
