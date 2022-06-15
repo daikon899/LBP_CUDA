@@ -32,7 +32,7 @@ We could reach up to ***15x speed-up*** on GeForce GTX 980 Ti.
 
 
 # More details
-For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available only in italian language, sorry_)
+For a detailed description of code implementation and tests you can check our [report](/docs/report.pdf). (_available only in italian, sorry_)
 
 We also made a similar comparison between sequential vs [multithread version](https://github.com/sim-pez/lbp_omp) on CPU only.
 
